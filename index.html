@@ -89,16 +89,17 @@ a{text-decoration:none;color:inherit}
 
 /* ============ 平台选择：紧凑横向滚动 chip 条 ============ */
 .chips{
-  display:flex;gap:8px;overflow-x:auto;
+  display:flex;flex-wrap:wrap;gap:8px;
   padding:16px 2px 14px;margin:0 -2px;
   scrollbar-width:none;-ms-overflow-style:none;
 }
 .chips::-webkit-scrollbar{display:none}
 .chip{
   flex:none;display:inline-flex;align-items:center;gap:6px;
-  padding:8px 13px;border-radius:999px;cursor:pointer;
+  padding:9px 13px;border-radius:var(--r);cursor:pointer;
   background:var(--card);border:1px solid var(--line);
   box-shadow:var(--shadow-sm);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   font-size:12.5px;font-weight:600;color:var(--sub);font-family:inherit;
   transition:all .18s;
 }
