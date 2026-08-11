@@ -423,6 +423,7 @@ $('#updTime').textContent = ts;
 $('#updTime2').textContent = ts;
 bindChips();
 $('#refreshBtn').addEventListener('click', refresh);
+refresh(); // 页面加载立即拉取实时数据（不等整点）
 </script>
 </body>
 </html>
