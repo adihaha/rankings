@@ -334,23 +334,78 @@ function bindChips(){
   });
 }
 
+/* 平台名 → 60s API 端点 */
+const API_BASE = 'https://60s.viki.moe';
+const API_MAP = {
+  '微博热搜':'/v2/weibo','知乎话题榜':'/v2/zhihu','百度实时热搜':'/v2/baidu/hot',
+  '头条热搜榜':'/v2/toutiao','抖音热搜':'/v2/douyin','哔哩哔哩热搜':'/v2/bili',
+  '小红书热点':'/v2/rednote','夸克热点':'/v2/quark','IT之家热门榜':'/v2/it-news/rank',
+  '豆瓣口碑电影':'/v2/douban/weekly/movie','必应每日壁纸':'/v2/bing'
+};
+/* 各平台条目字段名可能不同，统一提取 */
+function normalizeItems(items){
+  if(!Array.isArray(items)) return [];
+  return items.map(it=>{
+    const title = it.title || it.word || it.name || it.hotword || it.keyword || '';
+    const link = it.link || it.url || it.share_url || it.mobile_url || '';
+    const hot = it.hot_value || it.hot || it.num || it.heat || it.value || 0;
+    return { title:String(title), link:String(link), hot:Number(hot)||0 };
+  }).filter(it=>it.title);
+}
+
 async function refresh(){
   const btn = $('#refreshBtn');
   btn.classList.add('spin');
+  let updated = false;
+  // 第一优先：直连 60s API 实时拉取
   try{
-    const r = await fetch('./data.json', {cache:'no-store'});
-    if(r.ok){
-      const fresh = await r.json();
-      Object.keys(RANKINGS).forEach(k=>delete RANKINGS[k]);
-      Object.assign(RANKINGS, fresh);
-    }
-  }catch(e){ /* file:// 或离线：继续使用内嵌数据 */ }
+    const entries = Object.entries(API_MAP);
+    const results = await Promise.all(entries.map(async ([name, ep])=>{
+      try{
+        const ctl = new AbortController();
+        const t = setTimeout(()=>ctl.abort(), 12000);
+        const r = await fetch(API_BASE+ep, {signal:ctl.signal, cache:'no-store'});
+        clearTimeout(t);
+        if(!r.ok) return [name, RANKINGS[name]||[]];
+        const j = await r.json();
+        const items = normalizeItems(j.data && (j.data.list||j.data.data||j.data) || (Array.isArray(j.data)?j.data:[]));
+        return [name, items];
+      }catch(e){ return [name, RANKINGS[name]||[]]; }
+    }));
+    Object.keys(RANKINGS).forEach(k=>delete RANKINGS[k]);
+    results.forEach(([name, items])=>{ RANKINGS[name] = items.slice(0,15); });
+    updated = true;
+  }catch(e){ /* 直连失败，走 data.json 兜底 */ }
+  // 第二优先：data.json（线上静态副本）
+  if(!updated){
+    try{
+      const r = await fetch('./data.json', {cache:'no-store'});
+      if(r.ok){
+        const fresh = await r.json();
+        Object.keys(RANKINGS).forEach(k=>delete RANKINGS[k]);
+        Object.assign(RANKINGS, fresh);
+        updated = true;
+      }
+    }catch(e){ /* 第三优先：内嵌数据（已存在） */ }
+  }
   const ts = nowStr();
   $('#updTime').textContent = ts;
   $('#updTime2').textContent = ts;
   renderChips(); renderBoard();
   setTimeout(()=>btn.classList.remove('spin'), 700);
 }
+
+/* 每小时整点自动刷新 */
+function scheduleAutoRefresh(){
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours()+1, 0, 0, 0);
+  const delay = next - now;
+  setTimeout(()=>{
+    refresh();
+    setInterval(refresh, 3600000); // 之后每小时
+  }, delay);
+}
+scheduleAutoRefresh();
 
 /* ============ 初始化 ============ */
 $('#statDate').textContent = todayStr();
